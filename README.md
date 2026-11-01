@@ -1,144 +1,116 @@
-# LGB: A Perceptually Uniform Color Space for Satellite Object Detection
+# LGB: A Hybrid Perceptual Color Space for Satellite Object Detection
 
 ---
 
 ## Overview
 
-Most object detection pipelines accept images in the standard **RGB** color space without question. This work challenges that default. We demonstrate that the red channel — the most redundant of the three RGB channels in luminance-heavy satellite scenes — can be replaced with a more informative brightness representation to measurably improve detection performance.
+Object detectors almost always take RGB images as input. This work asks whether the red channel, which is highly correlated with the green and blue channels, can be replaced by a perceptual brightness signal.
 
-We propose and evaluate **LGB**, a novel input color space derived from the perceptually uniform **OKLab** color model, and compare it against the RGB baseline and the previously published **YGB** space. All three color spaces are evaluated on identical YOLOv8n architectures trained from scratch on the **SIMD** (Satellite Imagery Multi-vehicles Dataset) [gotten from kaggle](https://www.kaggle.com/datasets/akhileshnegi/satellite-imagery-of-multiple-vehicles/data), using a channel masking XAI pipeline to explain *why* a given color space works, not just *how well* it works.
+We propose **LGB**, a three-channel input in which the red channel is replaced by the lightness **L** of the perceptually uniform **OKLab** color space, and compare it with **RGB** and with the previously published **YGB** (red replaced by YCbCr luminance **Y**). Each color representation is evaluated on two satellite datasets with four detectors (YOLOv8n, YOLO12n, YOLO26n, and Faster R-CNN), giving 24 trained detectors. Channel masking ablation and paired t-tests examine how much each detector depends on each channel.
+
+<p align="center">
+  <img src="figures/pipeline.png" alt="Pipeline" width="800"/>
+  <br>
+  <em>Fig. 1: Pipeline: color conversion, data split, class imbalance handling, detector training, and channel masking ablation.</em>
+</p>
 
 ---
-<p align="center">
-  <img src="Pipeline.png" alt="MCSE-YOLO Framework Pipeline" width="800"/>
-  <br>
-  <em>Fig. 1: The overall MCSE-YOLO framework — color conversion, data split, YOLOv8n training, and channel ablation.</em>
-</p>
 
 ## The Core Idea
 
 RGB has two structural problems for CNN-based detection:
 
-1. **High inter-channel correlation** — The R, G, and B channels share redundant luminance information (pairwise correlations of 0.78–0.98). The network must implicitly resolve this redundancy rather than attending to discriminative object features.
-2. **Perceptual non-uniformity** — Equal Euclidean distances in RGB space do not correspond to equal perceived color differences, producing inconsistent feature representations across varying lighting conditions.
+1. **High inter-channel correlation.** The R, G, and B channels share redundant luminance information (pairwise correlations of 0.78 to 0.98), so the network must implicitly resolve this redundancy.
+2. **Perceptual non-uniformity.** Equal Euclidean distances in RGB do not correspond to equal perceived color differences.
 
-We address both by replacing the red channel — the least informative channel for satellite object detection — with an explicit brightness signal:
+LGB replaces the red channel with an explicit, perceptually uniform brightness signal:
 
 | Color Space | Channel 1 | Channel 2 | Channel 3 | Key Property |
 |-------------|-----------|-----------|-----------|--------------|
 | **RGB** | Red | Green | Blue | Baseline (sensor-native) |
-| **YGB** | Luminance Y (YCbCr) | Green | Blue | Explicit linear brightness |
+| **YGB** | Luminance Y (YCbCr) | Green | Blue | Linear brightness |
 | **LGB** | Lightness L (OKLab) | Green | Blue | Perceptually uniform brightness |
 
-The key insight is that **LGB** provides brightness information that is both explicit *and* perceptually uniform — meaning equal numerical differences in L correspond to equal perceived brightness differences across the full luminance range.
+### Color conversion
+
+**YGB:** `Y = 0.299·R + 0.587·G + 0.114·B`
+
+**LGB:** L from OKLab, computed in four stages:
+1. **Gamma linearization** of sRGB to linear light
+2. **LMS transform** to cone-response space (matrix M1)
+3. **Cube-root compression** (approximates the nonlinear brightness response)
+4. **Lightness extraction** `L = 0.2104542·l' + 0.7936177·m' − 0.0040720·s'`
 
 ---
 
-## Methods at a Glance
+## Experimental Setup
 
-### Color Conversion
-
-**YGB** replaces Red with the YCbCr luminance component:
-```
-Y = 0.299·R + 0.587·G + 0.114·B
-```
-
-**LGB** replaces Red with the OKLab lightness component, computed via a four-stage pipeline:
-1. **Gamma linearization** — convert sRGB to linear light (removes gamma encoding)
-2. **LMS transform** — map linear RGB to cone-response space via matrix M₁
-3. **Cube root compression** — approximate the eye's nonlinear brightness sensitivity
-4. **Lightness extraction** — derive L via matrix M₂ weighting of compressed cone responses
-
-### Model
-
-- Architecture: **YOLOv8n** (anchor-free, lightweight)
-- Three identical models trained from random initialization — one per color space
-- Dataset: **SIMD** — 5,000 satellite images, 15 vehicle/aircraft classes, 35,577 annotated instances
-- Split: 80% train / 10% validation / 10% test (stratified)
-- Class imbalance handled via inverse-frequency weighted loss
-
-### XAI Evaluation — Channel Masking Ablation
-
-Individual input channels are zeroed out during inference. The drop in detection confidence reveals how much the model relies on each channel. Paired t-tests (p < 0.000001) statistically validate that observed differences are not due to chance.
+- **Datasets:** SIMD (5,000 images, 15 classes; [Kaggle](https://www.kaggle.com/datasets/akhileshnegi/satellite-imagery-of-multiple-vehicles/data)) and SkySeaLand, SSL (1,307 images, 4 classes; [link: add here]). Each is split 80/10/10 into train/validation/test.
+- **YOLO models** (YOLOv8n, YOLO12n, YOLO26n; Ultralytics): trained from scratch, standard Ultralytics loss and default augmentation, pixel values scaled to [0,1].
+- **Faster R-CNN** (ResNet-50 + FPN v2; torchvision): fine-tuned from COCO weights with class-weighted softmax cross-entropy (square-root inverse frequency) and flip-only augmentation. To avoid favoring RGB, all three color representations use the same color-neutral start: channel-independent normalization (mean 0.449, std 0.226), first-layer filters averaged over the input channels, and backbone BatchNorm statistics re-estimated on the training images.
+- **Metrics:** mAP@50-95 (primary), mAP@50, precision, and recall. YOLO and Faster R-CNN differ in pretraining, loss weighting, augmentation, and metric computation, so color spaces are compared within each detector.
+- Each configuration was trained once (seed 42).
 
 ---
 
 ## Key Results
 
-### Detection Performance
+### mAP@50-95 (best per row in bold)
 
-| Color Space | Precision | Recall | mAP@50 | mAP@50:95 |
-|-------------|-----------|--------|--------|-----------|
-| RGB | 0.6875 | 0.7348 | 0.7677 | 0.6236 |
-| YGB | **0.8273** | 0.6883 | 0.7773 | 0.6237 |
-| **LGB** | 0.7084 | **0.7568** | **0.7784** | **0.6264** |
+| Dataset | Model | RGB | YGB | LGB |
+|---------|-------|-----|-----|-----|
+| SIMD | YOLOv8n | 0.6199 | 0.6092 | **0.6286** |
+| SIMD | YOLO12n | **0.6197** | 0.5734 | 0.5646 |
+| SIMD | YOLO26n | **0.6151** | 0.5990 | 0.5948 |
+| SIMD | Faster R-CNN | 0.6558 | **0.6623** | 0.6577 |
+| SSL | YOLOv8n | 0.4252 | 0.4399 | **0.4442** |
+| SSL | YOLO12n | 0.3500 | 0.3476 | **0.3848** |
+| SSL | YOLO26n | **0.3257** | 0.2816 | 0.2903 |
+| SSL | Faster R-CNN | 0.5488 | 0.5572 | **0.5636** |
 
-- **LGB** achieves the highest mAP@50 and recall — best overall detection
-- **YGB** achieves the highest precision — fewer false positives, suitable for high-precision applications
-- **RGB** performs worst on mAP across both IoU thresholds
+LGB achieves the highest mAP@50-95 in 4 of the 8 dataset-architecture combinations, RGB in 3, and YGB in 1. LGB is a competitive alternative, not a universally superior replacement; the full tables (mAP@50, precision, recall) are in the paper.
 
-### Channel Importance (Ablation — Confidence Drop on Masking)
+### Channel masking ablation (mean detection confidence, LGB models)
 
-| Model | Channel Masked | Confidence Drop |
-|-------|---------------|-----------------|
-| RGB | Red | 8.82% |
-| YGB | Y (Luminance) | 69.13% |
-| **LGB** | **L (Lightness)** | **97.05%** |
+| Dataset | Model | Baseline | L masked | G masked | B masked |
+|---------|-------|----------|----------|----------|----------|
+| SIMD | YOLOv8n | 0.7000 | 0.0015 | 0.4985 | 0.4884 |
+| SIMD | Faster R-CNN | 0.9062 | 0.5379 | 0.2043 | 0.6026 |
+| SSL | YOLOv8n | 0.5267 | 0.0006 | 0.1817 | 0.1890 |
+| SSL | Faster R-CNN | 0.8653 | 0.7008 | 0.6977 | 0.3170 |
 
-The monotonic increase from 8.82% → 69.13% → 97.05% confirms that as the input representation moves from raw RGB to linear luminance to perceptually uniform lightness, the model increasingly centralizes its detection decisions on that first channel — evidence that explicit, high-quality brightness input becomes the dominant cue.
-
----
-
-## Contributions
-
-1. **LGB Color Space** — A novel three-channel input representation substituting Red with perceptually uniform OKLab lightness, reducing inter-channel redundancy while providing explicit structural brightness.
-
-2. **Three-Way Controlled Comparison** — Identical YOLOv8n architectures trained on RGB, YGB, and LGB, enabling clean attribution of performance differences to color space alone.
-
-3. **XAI Evaluation Framework** — Channel masking ablation combined with paired t-tests provides statistically validated, quantitative evidence of individual channel contributions to detection — an analysis absent from prior color space comparison studies.
-
+The YOLO models depend strongly on the L channel, whereas Faster R-CNN depends considerably less on L, and its most influential channel differs between the datasets. Paired t-tests (R in RGB vs. L in LGB) are significant in all comparisons (p < 0.00001). These are responses to a zero-filling intervention, not direct measurements of the information in each channel.
 
 ---
 
 ## Repository Structure
 
 ```
-mcse-yolo/
-├── data/
-│   └── simd/                   # SIMD dataset (not included — see dataset source)
-├── convert/
-│   ├── inspect_simd.m         
-│   └── prep_image.m           
-│   ├── rgb_passthrough.m         
-│   └── rgb_to_lgb           # OKLab lightness substitution (4-stage pipeline)
-│   ├── rgb_to_ygb.m         # YCbCr luminance substitution
-│   └── S3_verify_conversion      
-│   ├── S4_build_datasets       
-│   └── S6_intergrity_check.m  
-│   ├── S7_load_and_verify_models.m
-│   └── S8_load_models.m
-├── train_ablation_evaluate
-│   └── train.py # YOLOv8n training
-│   └── xai.py # Channel masking+ Evaluation          
-├── figures/
-│   └── pipeline.png    # Visual comparison of RGB / YGB / LGB conversion
-│   └── color_comparison.png    # Visual comparison of RGB / YGB / LGB conversion
+.
+├── matlab/               # color conversion (RGB -> YGB, RGB -> LGB) and dataset building
+├── YAML/                 # dataset configs (data.yaml) for the YOLO runs
+├── YOLO/                 # YOLO training notebooks
+├── F-RCNN/               # Faster R-CNN training, channel ablation, and paired t-test notebooks
+├── runs/                 # YOLO outputs (weights not included)
+├── runs_frcnn/           # Faster R-CNN outputs, default ImageNet normalization (weights not included)
+├── runs_frcnn_neutral/   # Faster R-CNN outputs, color-neutral start (weights not included)
+├── figures/              # pipeline.png, color_comparison.png
 └── README.md
 ```
 
----
+## How to Reproduce
+
+1. Download SIMD and SSL and convert the images to RGB, YGB, and LGB with the scripts in `matlab/`.
+2. Train the YOLO models with the notebooks in `YOLO/` (dataset configs in `YAML/`).
+3. Train Faster R-CNN and run the channel ablation and paired t-tests with the notebooks in `F-RCNN/`.
 
 ## Dependencies
 
 ```bash
-pip install ultralytics==8.4.38 torch torchvision numpy opencv-python scipy
+pip install ultralytics==8.4.38 torch torchvision torchmetrics numpy opencv-python scipy
 ```
 
-- Python 3.13+
-- PyTorch 2.7+
-- Ultralytics YOLOv8
-
----
+- Python 3.13+, PyTorch 2.7+, MATLAB (color conversion)
 
 ---
 
@@ -147,5 +119,6 @@ pip install ultralytics==8.4.38 torch torchvision numpy opencv-python scipy
 - Ottosson, B. (2020). *A perceptual color space for image processing.* OKLab.
 - Tkalcic, M. & Tasic, J.F. (2003). *Colour spaces: perceptual, historical and applicational background.* IEEE.
 - Idris, N. & Mashaly, M. (2024). *Beyond RGB: Channel fusion for improved cross-domain car detection.* ICCA 2024.
+- Ren, S., He, K., Girshick, R. & Sun, J. (2015). *Faster R-CNN: Towards real-time object detection with region proposal networks.* NeurIPS.
 - Jocher, G., Qiu, J., & Chaurasia, A. (2023). *Ultralytics YOLO.* https://github.com/ultralytics/ultralytics
 - Haroon, M. et al. (2020). *Multi-sized object detection using spaceborne optical imagery.* IEEE JSTARS.
