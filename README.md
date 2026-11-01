@@ -9,7 +9,7 @@ Object detectors almost always take RGB images as input. This work asks whether 
 We propose **LGB**, a three-channel input in which the red channel is replaced by the lightness **L** of the perceptually uniform **OKLab** color space, and compare it with **RGB** and with the previously published **YGB** (red replaced by YCbCr luminance **Y**). Each color representation is evaluated on two satellite datasets with four detectors (YOLOv8n, YOLO12n, YOLO26n, and Faster R-CNN), giving 24 trained detectors. Channel masking ablation and paired t-tests examine how much each detector depends on each channel.
 
 <p align="center">
-  <img src="figures/pipeline.jpg" alt="Pipeline" width="800"/>
+  <img src="figures/pipeline.jpg" alt="PIPELINE" width="800"/>
   <br>
   <em>Fig. 1: Pipeline: color conversion, data split, class imbalance handling, detector training, and channel masking ablation.</em>
 </p>
