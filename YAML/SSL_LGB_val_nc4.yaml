@@ -1,0 +1,10 @@
+names:
+- airplane
+- boat
+- car
+- ship
+nc: 4
+path: C:\Users\DELL\Desktop\c\SSL_LGB
+test: test/images
+train: train/images
+val: VAL/images

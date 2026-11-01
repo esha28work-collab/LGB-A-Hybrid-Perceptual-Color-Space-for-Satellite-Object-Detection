@@ -1,0 +1,21 @@
+names:
+- car
+- truck
+- van
+- longvehicle
+- bus
+- airliner
+- propeller
+- trainer
+- chartered
+- fighter
+- other
+- stairtruck
+- pushbacktruck
+- helicopter
+- boat
+nc: 15
+path: C:\Users\DELL\Desktop\c\SIMD_RGB
+test: test/images
+train: train/images
+val: val/images
