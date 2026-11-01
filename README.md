@@ -45,7 +45,7 @@ LGB replaces the red channel with an explicit, perceptually uniform brightness s
 
 ## Experimental Setup
 
-- **Datasets:** SIMD (5,000 images, 15 classes; [Kaggle](https://www.kaggle.com/datasets/akhileshnegi/satellite-imagery-of-multiple-vehicles/data)) and SkySeaLand, SSL (1,307 images, 4 classes; [link: add here]). Each is split 80/10/10 into train/validation/test.
+- **Datasets:** SIMD (5,000 images, 15 classes; [Kaggle](https://www.kaggle.com/datasets/akhileshnegi/satellite-imagery-of-multiple-vehicles/data)) and SkySeaLand, SSL (1,307 images, 4 classes; [[link: add here]](https://www.kaggle.com/dsv/13673736). Each is split 80/10/10 into train/validation/test.
 - **YOLO models** (YOLOv8n, YOLO12n, YOLO26n; Ultralytics): trained from scratch, standard Ultralytics loss and default augmentation, pixel values scaled to [0,1].
 - **Faster R-CNN** (ResNet-50 + FPN v2; torchvision): fine-tuned from COCO weights with class-weighted softmax cross-entropy (square-root inverse frequency) and flip-only augmentation. To avoid favoring RGB, all three color representations use the same color-neutral start: channel-independent normalization (mean 0.449, std 0.226), first-layer filters averaged over the input channels, and backbone BatchNorm statistics re-estimated on the training images.
 - **Metrics:** mAP@50-95 (primary), mAP@50, precision, and recall. YOLO and Faster R-CNN differ in pretraining, loss weighting, augmentation, and metric computation, so color spaces are compared within each detector.
