@@ -1,4 +1,4 @@
-# LGB: A Hybrid Perceptual Color Space for Satellite Object Detection
+# LGB-journal
 
 ---
 
