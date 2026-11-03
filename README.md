@@ -1,4 +1,4 @@
-# LGB-journal
+# LGB: A Perceptually Motivated Color Representation for Deep Object Detection
 
 ---
 
